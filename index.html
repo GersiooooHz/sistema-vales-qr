@@ -21,6 +21,14 @@
 <header><h1>Vales QR</h1><p>Prueba de escaneo en vivo · Etapa 1</p></header>
 <main>
   <section class="panel">
+    <h2>Conexión con vales</h2>
+    <p class="hint">Prueba de conexión privada. No modifica las planillas.</p>
+    <p id="bridge-status" role="status">Esperando conexión con Apps Script…</p>
+    <button id="test-bridge" class="secondary" disabled>Consultar vales</button>
+    <pre id="bridge-result" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px"></pre>
+    <iframe id="vales-bridge" title="Conexión privada con Apps Script" style="width:0;height:0;border:0;position:absolute" referrerpolicy="no-referrer" src="https://script.google.com/macros/s/AKfycbw4EeAOQdRkZomiplKCPKpt-7dLLQVlcSxbLC5AhP0Fd16xdHr3wWqxTxWLTvA6qeE0/exec?bridge=1"></iframe>
+  </section>
+  <section class="panel">
     <h2>Escanear código QR</h2>
     <p class="hint">Esta versión solo lee el QR. No registra productos ni modifica Google Sheets.</p>
     <div id="reader"></div>
@@ -37,6 +45,43 @@
 </main>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
+  const bridgeFrame=document.getElementById('vales-bridge');
+  const bridgeStatus=document.getElementById('bridge-status');
+  const bridgeResult=document.getElementById('bridge-result');
+  const testBridge=document.getElementById('test-bridge');
+  let bridgeReady=false, requestSeq=0;
+  const pending=new Map();
+  window.addEventListener('message',event=>{
+    if(event.source!==bridgeFrame.contentWindow)return;
+    const d=event.data;
+    if(!d||d.protocol!=='vales-qr-v1')return;
+    if(d.type==='ready'){
+      bridgeReady=true;bridgeStatus.textContent='Puente conectado. Puedes consultar los vales.';
+      testBridge.disabled=false;
+    }
+    if(d.type==='response'&&pending.has(d.id)){
+      const p=pending.get(d.id);pending.delete(d.id);
+      d.ok?p.resolve(d.data):p.reject(new Error(String(d.data)));
+    }
+  });
+  function callBackend(method,...args){
+    if(!bridgeReady)return Promise.reject(new Error('El puente aún no está conectado.'));
+    return new Promise((resolve,reject)=>{
+      const id=String(++requestSeq);
+      pending.set(id,{resolve,reject});
+      bridgeFrame.contentWindow.postMessage({protocol:'vales-qr-v1',type:'request',id,method,args},'*');
+      setTimeout(()=>{if(pending.has(id)){pending.delete(id);reject(new Error('Tiempo de espera agotado.'));}},20000);
+    });
+  }
+  testBridge.addEventListener('click',async()=>{
+    testBridge.disabled=true;bridgeStatus.textContent='Consultando vales…';
+    try{
+      const vales=await callBackend('obtenerVales');
+      bridgeResult.textContent=JSON.stringify(vales,null,2);
+      bridgeStatus.textContent='Consulta completada: '+vales.length+' vales.';
+    }catch(e){bridgeStatus.textContent='Error de conexión: '+e.message;}
+    finally{testBridge.disabled=false;}
+  });
   const startBtn=document.getElementById('start');
   const stopBtn=document.getElementById('stop');
   const statusEl=document.getElementById('status');
