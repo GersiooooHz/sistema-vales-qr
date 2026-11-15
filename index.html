@@ -50,13 +50,20 @@
   const bridgeResult=document.getElementById('bridge-result');
   const testBridge=document.getElementById('test-bridge');
   let bridgeReady=false, requestSeq=0;
+  const bridgeTimeout=setTimeout(()=>{
+    if(!bridgeReady){
+      bridgeStatus.textContent='No se pudo establecer conexión con Apps Script. El navegador puede estar bloqueando el puente privado.';
+      bridgeStatus.className='error';
+      bridgeResult.textContent='El escáner QR sigue disponible. No cambies los permisos de Apps Script a «Cualquier persona». La conexión con Google Sheets está deshabilitada hasta resolver la autenticación.';
+    }
+  },12000);
   const pending=new Map();
   window.addEventListener('message',event=>{
     if(event.source!==bridgeFrame.contentWindow)return;
     const d=event.data;
     if(!d||d.protocol!=='vales-qr-v1')return;
     if(d.type==='ready'){
-      bridgeReady=true;bridgeStatus.textContent='Puente conectado. Puedes consultar los vales.';
+      bridgeReady=true;clearTimeout(bridgeTimeout);bridgeStatus.className='ok';bridgeStatus.textContent='Puente conectado. Puedes consultar los vales.';
       testBridge.disabled=false;
     }
     if(d.type==='response'&&pending.has(d.id)){
