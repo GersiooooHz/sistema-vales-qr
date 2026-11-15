@@ -1,0 +1,16 @@
+<!doctype html><html><head><base target="_top"><meta charset="utf-8"></head><body><script>
+(function(){
+ const ORIGIN='https://gersioooohz.github.io';
+ const methods={obtenerVales:0,obtenerProductos:0,obtenerDetalleVale:1,crearVale:1,registrarQRUnidad:2,registrarQRMetros:3,registrarProducto:3};
+ window.addEventListener('message',function(event){
+  if(event.origin!==ORIGIN||event.source!==window.parent)return;
+  const d=event.data;
+  if(!d||d.protocol!=='vales-qr-v1'||d.type!=='request'||typeof d.id!=='string'||d.id.length>80)return;
+  if(!Object.prototype.hasOwnProperty.call(methods,d.method)||!Array.isArray(d.args)||d.args.length!==methods[d.method])return;
+  const reply=(ok,data)=>window.parent.postMessage({protocol:'vales-qr-v1',type:'response',id:d.id,ok,data},ORIGIN);
+  try{google.script.run.withSuccessHandler(x=>reply(true,x)).withFailureHandler(e=>reply(false,String(e&&e.message||e)))[d.method].apply(null,d.args);}
+  catch(e){reply(false,String(e&&e.message||e));}
+ });
+ window.parent.postMessage({protocol:'vales-qr-v1',type:'ready'},ORIGIN);
+})();
+</script></body></html>
